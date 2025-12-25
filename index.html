@@ -3,58 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Particle System</title>
+    <title>Interactive Hover Particles</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden; /* Prevent scrollbars */
-            background-color: #000;
-        }
-        canvas {
-            display: block;
-        }
+        body { margin: 0; overflow: hidden; background: #111; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-
-    <canvas id="particleCanvas"></canvas>
+    <canvas id="canvas"></canvas>
 
     <script>
-        const canvas = document.getElementById('particleCanvas');
+        const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
+        let particles = [];
+        const mouse = { x: null, y: null, radius: 100 }; // Hover radius
 
-        // Resize canvas to fill the window
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            init(); // Re-center particles on resize
         }
         window.addEventListener('resize', resize);
-        resize();
-
-        const particles = [];
-        const particleCount = 100;
 
         class Particle {
-            constructor() {
-                this.init();
-            }
-
-            init() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 5 + 1;
-                this.speedX = Math.random() * 3 - 1.5;
-                this.speedY = Math.random() * 3 - 1.5;
-                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
-            }
-
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-
-                // Bounce off edges
-                if (this.x > canvas.width || this.x < 0) this.speedX *= -1;
-                if (this.y > canvas.height || this.y < 0) this.speedY *= -1;
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.baseSize = Math.random() * 3 + 1;
+                this.size = this.baseSize;
+                this.color = 'rgba(100, 200, 255, 0.8)';
             }
 
             draw() {
@@ -63,29 +45,52 @@
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            update() {
+                // Calculate distance between mouse and particle
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+
+                // If mouse is close, enlarge; otherwise, shrink back to baseSize
+                if (distance < mouse.radius) {
+                    this.size = this.baseSize * 5; // Enlarge 5x
+                    this.color = '#ff0077';        // Change color on hover
+                } else {
+                    if (this.size > this.baseSize) {
+                        this.size -= 0.5; // Smoothly shrink
+                    }
+                    this.color = 'rgba(100, 200, 255, 0.8)';
+                }
+            }
         }
 
-        // Create particle instances
-        function createParticles() {
-            for (let i = 0; i < particleCount; i++) {
-                particles.push(new Particle());
+        function init() {
+            particles = [];
+            const rows = 20;
+            const cols = 20;
+            const spacing = 30;
+
+            // Create a grid of particles in the center
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    let x = (canvas.width / 2 - (cols * spacing) / 2) + (j * spacing);
+                    let y = (canvas.height / 2 - (rows * spacing) / 2) + (i * spacing);
+                    particles.push(new Particle(x, y));
+                }
             }
         }
 
         function animate() {
-            // Semi-transparent clear creates a "trail" effect
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            particles.forEach(particle => {
-                particle.update();
-                particle.draw();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
             });
-
             requestAnimationFrame(animate);
         }
 
-        createParticles();
+        resize();
         animate();
     </script>
 </body>
