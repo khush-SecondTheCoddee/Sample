@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Hover Particles</title>
+    <title>Ultimate Particle System</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #111; }
+        body { margin: 0; overflow: hidden; background: #050505; }
         canvas { display: block; }
     </style>
 </head>
@@ -16,7 +16,12 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
-        const mouse = { x: null, y: null, radius: 100 }; // Hover radius
+        
+        const mouse = {
+            x: null,
+            y: null,
+            radius: 150 // Area of influence
+        };
 
         window.addEventListener('mousemove', (e) => {
             mouse.x = e.x;
@@ -26,7 +31,7 @@
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            init(); // Re-center particles on resize
+            init(); 
         }
         window.addEventListener('resize', resize);
 
@@ -34,59 +39,91 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.baseSize = Math.random() * 3 + 1;
-                this.size = this.baseSize;
-                this.color = 'rgba(100, 200, 255, 0.8)';
+                this.baseX = x; // Home position X
+                this.baseY = y; // Home position Y
+                this.size = 2;
+                this.density = (Math.random() * 30) + 1; // Weight/Speed of return
             }
 
             draw() {
-                ctx.fillStyle = this.color;
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.closePath();
                 ctx.fill();
             }
 
             update() {
-                // Calculate distance between mouse and particle
                 let dx = mouse.x - this.x;
                 let dy = mouse.y - this.y;
                 let distance = Math.sqrt(dx * dx + dy * dy);
-
-                // If mouse is close, enlarge; otherwise, shrink back to baseSize
+                
+                // Repel logic
                 if (distance < mouse.radius) {
-                    this.size = this.baseSize * 5; // Enlarge 5x
-                    this.color = '#ff0077';        // Change color on hover
+                    let forceDirectionX = dx / distance;
+                    let forceDirectionY = dy / distance;
+                    let force = (mouse.radius - distance) / mouse.radius;
+                    let directionX = forceDirectionX * force * this.density;
+                    let directionY = forceDirectionY * force * this.density;
+                    
+                    this.x -= directionX;
+                    this.y -= directionY;
+                    this.size = 5; // Enlarge
                 } else {
-                    if (this.size > this.baseSize) {
-                        this.size -= 0.5; // Smoothly shrink
+                    // Elastic Return logic
+                    if (this.x !== this.baseX) {
+                        let dx = this.x - this.baseX;
+                        this.x -= dx / 10; // "Spring" back speed
                     }
-                    this.color = 'rgba(100, 200, 255, 0.8)';
+                    if (this.y !== this.baseY) {
+                        let dy = this.y - this.baseY;
+                        this.y -= dy / 10;
+                    }
+                    if (this.size > 2) this.size -= 0.1; // Shrink back
                 }
             }
         }
 
         function init() {
             particles = [];
-            const rows = 20;
-            const cols = 20;
-            const spacing = 30;
-
-            // Create a grid of particles in the center
-            for (let i = 0; i < rows; i++) {
-                for (let j = 0; j < cols; j++) {
-                    let x = (canvas.width / 2 - (cols * spacing) / 2) + (j * spacing);
-                    let y = (canvas.height / 2 - (rows * spacing) / 2) + (i * spacing);
+            // Create a dense grid
+            const gap = 25;
+            for (let y = 0; y < canvas.height; y += gap) {
+                for (let x = 0; x < canvas.width; x += gap) {
                     particles.push(new Particle(x, y));
                 }
             }
         }
 
+        function connect() {
+            for (let a = 0; a < particles.length; a++) {
+                for (let b = a; b < particles.length; b++) {
+                    let dx = particles[a].x - particles[b].x;
+                    let dy = particles[a].y - particles[b].y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 30) {
+                        ctx.strokeStyle = `rgba(0, 255, 255, ${1 - distance/30})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[a].x, particles[a].y);
+                        ctx.lineTo(particles[b].x, particles[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => {
-                p.update();
-                p.draw();
-            });
+            // Using a slight trail effect
+            ctx.fillStyle = 'rgba(5, 5, 5, 0.5)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            connect();
             requestAnimationFrame(animate);
         }
 
