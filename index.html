@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Particle System</title>
+    <title>Ultimate Interactive Particle System</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; }
+        body { margin: 0; overflow: hidden; background: #000; cursor: crosshair; }
         canvas { display: block; }
     </style>
 </head>
@@ -16,16 +16,27 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
+        let hue = 0;
         
-        const mouse = {
-            x: null,
-            y: null,
-            radius: 150 // Area of influence
-        };
+        const mouse = { x: null, y: null, radius: 150 };
 
         window.addEventListener('mousemove', (e) => {
             mouse.x = e.x;
             mouse.y = e.y;
+        });
+
+        // Feature: Explode on Click
+        window.addEventListener('mousedown', () => {
+            particles.forEach(p => {
+                const dx = p.x - mouse.x;
+                const dy = p.y - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const force = (canvas.width / distance) * 2; // Explosive power
+                if (distance < 500) {
+                    p.vx = (dx / distance) * force;
+                    p.vy = (dy / distance) * force;
+                }
+            });
         });
 
         function resize() {
@@ -39,17 +50,19 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.baseX = x; // Home position X
-                this.baseY = y; // Home position Y
+                this.baseX = x;
+                this.baseY = y;
+                this.vx = 0; // Velocity X
+                this.vy = 0; // Velocity Y
                 this.size = 2;
-                this.density = (Math.random() * 30) + 1; // Weight/Speed of return
+                this.density = (Math.random() * 30) + 1;
             }
 
             draw() {
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+                // Feature: Dynamic HSL Colors
+                ctx.fillStyle = `hsl(${hue}, 100%, 60%)`;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.closePath();
                 ctx.fill();
             }
 
@@ -60,34 +73,29 @@
                 
                 // Repel logic
                 if (distance < mouse.radius) {
-                    let forceDirectionX = dx / distance;
-                    let forceDirectionY = dy / distance;
                     let force = (mouse.radius - distance) / mouse.radius;
-                    let directionX = forceDirectionX * force * this.density;
-                    let directionY = forceDirectionY * force * this.density;
-                    
-                    this.x -= directionX;
-                    this.y -= directionY;
-                    this.size = 5; // Enlarge
+                    this.vx -= (dx / distance) * force * this.density * 0.5;
+                    this.vy -= (dy / distance) * force * this.density * 0.5;
+                    if (this.size < 6) this.size += 0.5;
                 } else {
-                    // Elastic Return logic
-                    if (this.x !== this.baseX) {
-                        let dx = this.x - this.baseX;
-                        this.x -= dx / 10; // "Spring" back speed
-                    }
-                    if (this.y !== this.baseY) {
-                        let dy = this.y - this.baseY;
-                        this.y -= dy / 10;
-                    }
-                    if (this.size > 2) this.size -= 0.1; // Shrink back
+                    // Elastic Return (Friction + Spring)
+                    let homeDx = this.x - this.baseX;
+                    let homeDy = this.y - this.baseY;
+                    this.vx -= homeDx * 0.05; // Spring constant
+                    this.vy -= homeDy * 0.05;
+                    this.vx *= 0.9; // Friction
+                    this.vy *= 0.9;
+                    if (this.size > 2) this.size -= 0.2;
                 }
+
+                this.x += this.vx;
+                this.y += this.vy;
             }
         }
 
         function init() {
             particles = [];
-            // Create a dense grid
-            const gap = 25;
+            const gap = 20;
             for (let y = 0; y < canvas.height; y += gap) {
                 for (let x = 0; x < canvas.width; x += gap) {
                     particles.push(new Particle(x, y));
@@ -95,35 +103,16 @@
             }
         }
 
-        function connect() {
-            for (let a = 0; a < particles.length; a++) {
-                for (let b = a; b < particles.length; b++) {
-                    let dx = particles[a].x - particles[b].x;
-                    let dy = particles[a].y - particles[b].y;
-                    let distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance < 30) {
-                        ctx.strokeStyle = `rgba(0, 255, 255, ${1 - distance/30})`;
-                        ctx.lineWidth = 1;
-                        ctx.beginPath();
-                        ctx.moveTo(particles[a].x, particles[a].y);
-                        ctx.lineTo(particles[b].x, particles[b].y);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-
         function animate() {
-            // Using a slight trail effect
-            ctx.fillStyle = 'rgba(5, 5, 5, 0.5)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // Feature: Motion Trails
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].update();
-                particles[i].draw();
-            }
-            connect();
+            hue += 0.5; // Slowly cycle colors
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
             requestAnimationFrame(animate);
         }
 
